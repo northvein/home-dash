@@ -1,0 +1,11 @@
+{
+  "sources": [
+    {
+      "id": 1,
+      "name": "UK Holidays",
+      "url": "https://www.gov.uk/bank-holidays/england-and-wales.ics",
+      "filename": "england-and-wales.ics",
+      "memberId": null
+    }
+  ]
+}

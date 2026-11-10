@@ -1,5 +1,9 @@
 # Home Dash
 
+> **Status (10 Nov 2026):** `app/` holds **v1** — the original local-sync build (Python `sync.py` / `serve.py` / `setup.py` plus `home-calendar.html`), run directly with Python as described in [`docs/local-sync-setup.md`](docs/local-sync-setup.md). The Weyland-Yutani themed, Dockerised build described below will be added on top of it; until then the Docker quick start won't work.
+>
+> Copy `app/calendars.example.json` to `app/calendars.json` and add your own feeds. Use private/secret iCal links, and keep `calendars.json` out of git (it's in `.gitignore`).
+
 ## Overview
 
 A self-hosted, wall-mounted family calendar display running on a 10-inch Android tablet in a picture frame. The display is permanently on, showing the current week's events, live UK weather, the time, and upcoming bin collections — all themed in the Weyland-Yutani corporate terminal aesthetic from the Alien franchise: `#F5C518` gold on near-black, sharp corners, all-caps tracking.

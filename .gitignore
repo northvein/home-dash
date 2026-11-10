@@ -1,0 +1,7 @@
+# Runtime data — never commit (calendar URLs can contain private tokens)
+app/calendars.json
+app/ics/
+app/sync.log
+data/
+.DS_Store
+__pycache__/

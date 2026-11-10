@@ -1,0 +1,1104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Home Calendar</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body {
+  width: 100%; height: 100%; overflow: hidden;
+  font-family: Arial, Helvetica, sans-serif;
+  background: #ffffff; color: #111111; font-size: 15px;
+}
+#app { display: flex; flex-direction: column; width: 100vw; height: 100vh; }
+
+/* ══ TOP BAR 40vh ══ */
+#top-bar {
+  flex: 0 0 40vh;
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  border-bottom: 3px solid #000000;
+  background: #ffffff;
+  overflow: hidden;
+}
+.top-panel {
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  padding: 8px 14px; position: relative;
+  overflow: hidden;
+}
+.top-panel + .top-panel { border-left: 2px solid #000000; }
+.panel-label {
+  font-size: 10px; font-weight: bold; letter-spacing: 0.14em;
+  text-transform: uppercase; color: #000000; margin-bottom: 8px;
+  border-bottom: 1px solid #000000; padding-bottom: 4px; width: 100%; text-align: center;
+}
+
+/* Clock */
+#clock-display {
+  font-size: clamp(52px, 8.5vw, 108px);
+  font-weight: bold; color: #000000;
+  letter-spacing: -3px; line-height: 1;
+}
+#date-display {
+  font-size: clamp(12px, 1.5vw, 17px);
+  color: #000000; margin-top: 6px; text-align: center; font-weight: bold;
+}
+
+/* Weather */
+#weather-main { display: flex; align-items: center; gap: 10px; margin-bottom: 4px; }
+#weather-icon { font-size: clamp(34px, 5vw, 60px); line-height: 1; }
+#weather-temp { font-size: clamp(34px, 5vw, 60px); font-weight: bold; color: #000000; line-height: 1; }
+#weather-desc { font-size: clamp(12px, 1.4vw, 16px); color: #000000; font-weight: bold; text-align: center; }
+#weather-detail { font-size: clamp(10px, 1.1vw, 13px); color: #000000; text-align: center; margin-top: 3px; }
+#weather-attrib { position: absolute; bottom: 5px; font-size: 9px; color: #888888; letter-spacing: 0.04em; }
+
+/* Weather timeline — high contrast */
+#weather-timeline {
+  display: flex; gap: 0; align-items: stretch;
+  margin-top: 7px; width: 100%;
+  border: 2px solid #000000; border-radius: 0; overflow: hidden;
+}
+.wt-slot {
+  flex: 1; display: flex; flex-direction: column; align-items: center;
+  padding: 5px 2px; gap: 2px; border-right: 1px solid #000000;
+  background: #ffffff;
+}
+.wt-slot:last-child { border-right: none; }
+.wt-slot.wt-now { background: #000000; }
+.wt-slot.wt-now .wt-time,
+.wt-slot.wt-now .wt-temp,
+.wt-slot.wt-now .wt-rain { color: #ffffff; }
+.wt-time { font-size: 9px; color: #000000; font-weight: bold; letter-spacing: 0.04em; }
+.wt-icon { font-size: 16px; line-height: 1; }
+.wt-temp { font-size: 12px; font-weight: bold; color: #000000; }
+.wt-rain { font-size: 9px; color: #000000; font-weight: bold; }
+
+/* Bin icons — coloured, contained, three visual states */
+#bin-icons {
+  display: flex; gap: 12px; align-items: flex-end;
+  margin-bottom: 6px;
+  /* prevent any overflow into adjacent content */
+  width: 100%; justify-content: center;
+}
+.bin-icon { display: flex; flex-direction: column; align-items: center; gap: 5px; flex-shrink: 0; }
+
+.bin-body {
+  /* Sizes purely in vh so they scale with the panel and never overflow */
+  width: 5.5vh; height: 7vh;
+  min-width: 36px; min-height: 46px;
+  max-width: 72px; max-height: 90px;
+  border-radius: 0; position: relative;
+  display: flex; align-items: center; justify-content: center;
+}
+.bin-lid {
+  position: absolute; top: -1.1vh; left: -0.4vh; right: -0.4vh;
+  height: 1.1vh; min-height: 8px; max-height: 14px;
+  border-radius: 0;
+}
+.bin-letter {
+  font-size: 1.6vh; min-font-size: 11px;
+  font-weight: bold; z-index: 1;
+}
+.bin-icon-lbl {
+  font-size: clamp(9px, 1.1vh, 13px);
+  font-weight: bold; text-align: center;
+  white-space: nowrap;
+}
+
+/* ── INACTIVE: not this week ── */
+.bin-icon.inactive .bin-body   { background: #f0f0f0; border: 2px solid #bbbbbb; }
+.bin-icon.inactive .bin-lid    { background: #d8d8d8; border: 2px solid #bbbbbb; }
+.bin-icon.inactive .bin-letter { color: #999999; }
+.bin-icon.inactive .bin-icon-lbl { color: #aaaaaa; }
+
+/* ── WEEK-ACTIVE: due this week — full colour, bold black outline ── */
+/* General waste: charcoal */
+.bin-icon.week-active.bin-type-black .bin-body { background: #2d2d2d; border: 3px solid #000000; }
+.bin-icon.week-active.bin-type-black .bin-lid  { background: #1a1a1a; border: 3px solid #000000; }
+/* Recycling: vivid green */
+.bin-icon.week-active.bin-type-green .bin-body { background: #1a7a2a; border: 3px solid #000000; }
+.bin-icon.week-active.bin-type-green .bin-lid  { background: #145a20; border: 3px solid #000000; }
+/* Garden: warm brown */
+.bin-icon.week-active.bin-type-brown .bin-body { background: #7a4010; border: 3px solid #000000; }
+.bin-icon.week-active.bin-type-brown .bin-lid  { background: #5a2e0a; border: 3px solid #000000; }
+.bin-icon.week-active .bin-letter  { color: #ffffff; font-size: 1.9vh; }
+.bin-icon.week-active .bin-icon-lbl { color: #000000; font-size: clamp(10px, 1.2vh, 14px); }
+
+/* ── TODAY/TOMORROW: due today or tomorrow — colour fill + thick outline + taller body ── */
+.bin-icon.today-active .bin-body {
+  height: 8.5vh; max-height: 108px; /* taller, not wider — no overflow risk */
+  border: 4px solid #000000;
+}
+.bin-icon.today-active .bin-lid {
+  top: -1.4vh; height: 1.4vh; max-height: 16px;
+  border-width: 4px;
+}
+/* General: deep charcoal */
+.bin-icon.today-active.bin-type-black .bin-body { background: #1a1a1a; }
+.bin-icon.today-active.bin-type-black .bin-lid  { background: #000000; border-color: #000000; }
+/* Recycling: saturated green */
+.bin-icon.today-active.bin-type-green .bin-body { background: #0d6620; }
+.bin-icon.today-active.bin-type-green .bin-lid  { background: #084d18; border-color: #000000; }
+/* Garden: deep brown */
+.bin-icon.today-active.bin-type-brown .bin-body { background: #6b3008; }
+.bin-icon.today-active.bin-type-brown .bin-lid  { background: #4e2006; border-color: #000000; }
+.bin-icon.today-active .bin-letter  { color: #ffffff; font-size: 2.1vh; font-weight: bold; }
+.bin-icon.today-active .bin-icon-lbl { color: #000000; font-size: clamp(11px, 1.3vh, 15px); font-weight: bold; }
+
+#bin-status { font-size: clamp(11px, 1.4vh, 16px); color: #000000; font-weight: bold; text-align: center; }
+#bin-next { font-size: clamp(9px, 1vh, 12px); color: #444444; text-align: center; margin-top: 3px; }
+
+/* ══ CALENDAR AREA 70vh — HIGH CONTRAST DARK ══ */
+#cal-area { flex: 1 1 0; display: flex; flex-direction: column; overflow: hidden; min-height: 0; background: #000000; }
+
+/* Nav strip */
+#cal-nav {
+  flex: 0 0 auto; display: flex; align-items: center; gap: 8px;
+  padding: 5px 14px; border-bottom: 2px solid #ffffff; background: #000000;
+}
+#cal-nav-title { font-size: 15px; font-weight: bold; color: #ffffff; flex: 1; min-width: 0; }
+.cnav-btn {
+  background: #000000; border: 2px solid #ffffff; color: #ffffff;
+  width: 28px; height: 28px; border-radius: 0; cursor: pointer;
+  font-size: 16px; display: flex; align-items: center; justify-content: center;
+  font-family: Arial, Helvetica, sans-serif;
+}
+.cnav-btn:hover { background: #333333; }
+.cnav-today {
+  background: #000000; border: 2px solid #ffffff; color: #ffffff;
+  font-family: Arial, Helvetica, sans-serif; font-size: 10px; font-weight: bold;
+  letter-spacing: 0.06em; text-transform: uppercase; padding: 4px 10px;
+  border-radius: 0; cursor: pointer;
+}
+.cnav-today:hover { background: #333333; }
+#members-strip { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.mem-pill {
+  display: flex; align-items: center; gap: 4px;
+  font-size: 10px; color: #ffffff; padding: 2px 7px;
+  border-radius: 0; border: 1px solid #ffffff; cursor: pointer;
+  font-family: Arial, Helvetica, sans-serif; transition: opacity 0.1s;
+}
+.mem-pill.off { opacity: 0.3; }
+.mem-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; border: 1px solid #ffffff; }
+.view-tabs { display: flex; border: 2px solid #ffffff; border-radius: 0; overflow: hidden; }
+.vtab {
+  background: #000000; border: none; border-right: 1px solid #ffffff;
+  color: #888888; font-family: Arial, Helvetica, sans-serif;
+  font-size: 10px; font-weight: bold; letter-spacing: 0.06em;
+  text-transform: uppercase; padding: 4px 10px; cursor: pointer;
+}
+.vtab:last-child { border-right: none; }
+.vtab.active { background: #ffffff; color: #000000; }
+.icon-btn {
+  background: #000000; border: 2px solid #ffffff; color: #ffffff;
+  width: 28px; height: 28px; border-radius: 0; cursor: pointer;
+  font-size: 14px; display: flex; align-items: center; justify-content: center;
+}
+.icon-btn:hover { background: #333333; }
+
+/* ══ WEEK VIEW — pure black/white ══ */
+#week-view { flex: 1 1 0; display: flex; flex-direction: column; overflow: hidden; min-height: 0; background: #000000; }
+#wk-hdr {
+  flex: 0 0 auto; display: grid; grid-template-columns: 46px repeat(7, 1fr);
+  border-bottom: 2px solid #ffffff; background: #000000;
+}
+.wkh-gut { border-right: 1px solid #444444; }
+.wkh-day { text-align: center; padding: 6px 3px; border-right: 1px solid #444444; }
+.wkh-day:last-child { border-right: none; }
+.wkh-dn { display: block; font-size: 9px; font-weight: bold; letter-spacing: 0.08em; text-transform: uppercase; color: #888888; }
+.wkh-num { display: block; font-size: 20px; font-weight: bold; color: #ffffff; line-height: 1.2; }
+.wkh-num.today { background: #ffffff; color: #000000; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto; font-size: 16px; }
+#wk-scroll { flex: 1 1 0; overflow-y: auto; min-height: 0; }
+#wk-body { display: grid; grid-template-columns: 46px repeat(7, 1fr); position: relative; }
+.wb-tc { border-right: 1px solid #333333; position: relative; background: #000000; }
+.wb-tl { position: absolute; right: 5px; font-size: 9px; color: #666666; transform: translateY(-50%); white-space: nowrap; }
+.wb-dc { border-right: 1px solid #333333; position: relative; background: #000000; }
+.wb-dc:last-child { border-right: none; }
+.hr-line { position: absolute; left: 0; right: 0; border-top: 1px solid #222222; }
+.hh-line { position: absolute; left: 0; right: 0; border-top: 1px dashed #1a1a1a; }
+.wk-evt {
+  position: absolute; left: 2px; right: 2px; border-radius: 0;
+  padding: 2px 4px; font-size: 10px; color: #ffffff;
+  overflow: hidden; cursor: pointer; z-index: 1;
+  font-family: Arial, Helvetica, sans-serif; line-height: 1.3;
+  border-left: 3px solid rgba(255,255,255,0.5);
+}
+.wk-evt:hover { opacity: 0.8; }
+.wk-evt.allday { top: 2px !important; height: 16px !important; }
+.now-line { position: absolute; left: 0; right: 0; height: 2px; background: #ffffff; z-index: 2; }
+.now-dot { position: absolute; left: -4px; top: -4px; width: 9px; height: 9px; border-radius: 50%; background: #ffffff; }
+
+/* ══ MONTH VIEW — pure black/white ══ */
+#month-view { flex: 1 1 0; display: flex; flex-direction: column; overflow: hidden; min-height: 0; background: #000000; }
+.mv-hdr { display: grid; grid-template-columns: repeat(7, 1fr); border-bottom: 2px solid #ffffff; background: #000000; flex: 0 0 auto; }
+.mv-dlbl { text-align: center; font-size: 9px; font-weight: bold; letter-spacing: 0.1em; text-transform: uppercase; color: #888888; padding: 7px 0; }
+.mv-grid { flex: 1 1 0; display: grid; grid-template-columns: repeat(7, 1fr); grid-auto-rows: 1fr; overflow: hidden; }
+.mv-cell { border-right: 1px solid #333333; border-bottom: 1px solid #333333; padding: 4px 5px; overflow: hidden; cursor: pointer; background: #000000; }
+.mv-cell:nth-child(7n) { border-right: none; }
+.mv-cell.om { background: #0a0a0a; }
+.mv-cell.tc { background: #1a1a1a; }
+.mv-num { font-size: 13px; font-weight: bold; color: #666666; width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin-bottom: 2px; }
+.mv-cell.tc .mv-num { background: #ffffff; color: #000000; }
+.mv-cell.om .mv-num { color: #333333; }
+.mv-evt { font-size: 10px; padding: 1px 3px; border-radius: 0; color: #ffffff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 1px; font-family: Arial, Helvetica, sans-serif; border-left: 2px solid rgba(255,255,255,0.4); }
+.mv-more { font-size: 9px; color: #666666; }
+
+/* ══ AGENDA VIEW — pure black/white ══ */
+#agenda-view { flex: 1 1 0; overflow-y: auto; padding: 14px 22px; background: #000000; }
+.ag-day { margin-bottom: 16px; }
+.ag-dhdr { display: flex; align-items: baseline; gap: 8px; border-bottom: 1px solid #333333; padding-bottom: 5px; margin-bottom: 5px; }
+.ag-dnum { font-size: 26px; font-weight: bold; color: #ffffff; line-height: 1; }
+.ag-dinfo { font-size: 11px; color: #888888; text-transform: uppercase; letter-spacing: 0.06em; }
+.ag-today-tag { margin-left: auto; font-size: 9px; font-weight: bold; letter-spacing: 0.1em; text-transform: uppercase; color: #ffffff; background: #ffffff; color: #000000; padding: 1px 5px; }
+.ag-evt { display: flex; gap: 10px; align-items: flex-start; padding: 6px 7px; border-radius: 0; cursor: pointer; margin-bottom: 2px; }
+.ag-evt:hover { background: #1a1a1a; }
+.ag-etime { font-size: 10px; color: #888888; min-width: 70px; padding-top: 2px; }
+.ag-ebar { width: 4px; border-radius: 0; align-self: stretch; min-height: 16px; flex-shrink: 0; }
+.ag-etitle { font-size: 13px; font-weight: bold; color: #ffffff; }
+.ag-esub { font-size: 10px; color: #888888; margin-top: 1px; }
+.ag-none { font-size: 11px; color: #555555; padding: 5px 7px; font-style: italic; }
+
+/* ══ EVENT POPUP — high contrast ══ */
+#evt-popup {
+  display: none; position: fixed; background: #000000;
+  border: 2px solid #ffffff; border-radius: 0; padding: 12px 16px;
+  min-width: 210px; max-width: 290px; z-index: 200;
+}
+#evt-popup.open { display: block; }
+#popup-bar { height: 3px; margin-bottom: 8px; background: #ffffff; }
+#popup-title { font-size: 15px; font-weight: bold; color: #ffffff; margin-bottom: 4px; }
+#popup-meta { font-size: 11px; color: #aaaaaa; line-height: 1.7; white-space: pre-wrap; }
+#popup-close { position: absolute; top: 7px; right: 9px; background: none; border: none; color: #888888; cursor: pointer; font-size: 17px; }
+
+/* ══ SETTINGS ══ */
+#settings-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.35); z-index: 300; align-items: center; justify-content: center; }
+#settings-overlay.open { display: flex; }
+#sp {
+  background: #fff; border: 1px solid #cccccc; border-radius: 5px;
+  width: 540px; max-height: 88vh; overflow-y: auto; font-family: Arial, Helvetica, sans-serif;
+}
+.sph { padding: 18px 22px 12px; border-bottom: 1px solid #eeeeee; display: flex; align-items: center; justify-content: space-between; }
+.sph-title { font-size: 17px; font-weight: bold; color: #111111; }
+.sph-close { background: none; border: 1px solid #cccccc; color: #555555; width: 26px; height: 26px; border-radius: 3px; cursor: pointer; font-size: 17px; display: flex; align-items: center; justify-content: center; }
+.sph-close:hover { background: #f0f0f0; }
+.spb { padding: 14px 22px; }
+.sps { margin-bottom: 22px; }
+.sps-title { font-size: 9px; font-weight: bold; letter-spacing: 0.12em; text-transform: uppercase; color: #999999; margin-bottom: 10px; padding-bottom: 4px; border-bottom: 1px solid #eeeeee; }
+.spr { display: flex; align-items: center; gap: 8px; margin-bottom: 7px; }
+.spl { font-size: 12px; color: #555555; min-width: 110px; }
+.spi { flex: 1; background: #f8f8f8; border: 1px solid #cccccc; color: #111111; font-family: Arial, Helvetica, sans-serif; font-size: 12px; padding: 5px 8px; border-radius: 3px; outline: none; }
+.spi:focus { border-color: #888888; }
+select.spi { max-width: 145px; }
+.sp-col { width: 32px; height: 26px; border: 1px solid #cccccc; border-radius: 3px; padding: 2px; cursor: pointer; }
+.mr-sp { display: flex; align-items: center; gap: 7px; margin-bottom: 5px; padding: 6px 8px; background: #f8f8f8; border-radius: 3px; }
+.mn-sp { flex: 1; background: none; border: none; color: #111111; font-family: Arial, Helvetica, sans-serif; font-size: 12px; outline: none; }
+.del { background: none; border: none; color: #cccccc; cursor: pointer; font-size: 17px; padding: 0 2px; }
+.del:hover { color: #cc3333; }
+.add-sp { background: none; border: 1px dashed #cccccc; color: #999999; font-family: Arial, Helvetica, sans-serif; font-size: 11px; padding: 5px 12px; border-radius: 3px; cursor: pointer; width: 100%; text-align: center; }
+.add-sp:hover { border-color: #888888; color: #555555; }
+.src-sp { background: #f8f8f8; border-radius: 3px; padding: 7px 9px; margin-bottom: 5px; }
+.src-sp-top { display: flex; align-items: center; gap: 7px; }
+.sdot { width: 7px; height: 7px; border-radius: 50%; background: #cccccc; flex-shrink: 0; }
+.sdot.ok { background: #27ae60; } .sdot.error { background: #cc3333; } .sdot.loading { background: #f0a500; }
+.sn { font-size: 12px; color: #333333; flex: 1; }
+.su { font-size: 9px; color: #aaaaaa; font-family: monospace; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sync-sp { font-size: 10px; background: #fff; border: 1px solid #cccccc; color: #555555; padding: 2px 7px; border-radius: 3px; cursor: pointer; }
+.sync-sp:hover { background: #eeeeee; }
+.sp-save { background: #111111; border: none; color: #fff; font-family: Arial, Helvetica, sans-serif; font-size: 11px; font-weight: bold; letter-spacing: 0.08em; text-transform: uppercase; padding: 9px 20px; border-radius: 3px; cursor: pointer; margin-top: 4px; }
+.sp-save:hover { background: #333333; }
+.bin-note { font-size: 10px; color: #888888; line-height: 1.6; margin-bottom: 10px; background: #f8f8f8; padding: 7px 9px; border-radius: 3px; border-left: 3px solid #cccccc; }
+
+/* ══ TOAST ══ */
+#toast { position: fixed; bottom: 18px; right: 18px; background: #111111; color: #fff; padding: 8px 14px; border-radius: 3px; font-size: 12px; z-index: 400; opacity: 0; transition: opacity 0.3s; pointer-events: none; font-family: Arial, Helvetica, sans-serif; }
+#toast.show { opacity: 1; }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- ══ TOP BAR 30vh ══ -->
+  <div id="top-bar">
+
+    <div class="top-panel">
+      <div class="panel-label">Time — United Kingdom</div>
+      <div id="clock-display">00:00</div>
+      <div id="date-display">Loading…</div>
+    </div>
+
+    <div class="top-panel">
+      <div class="panel-label">Weather — Garforth, Leeds</div>
+      <div id="weather-main">
+        <span id="weather-icon" style="font-size:36px">⋯</span>
+        <span id="weather-temp" style="font-size:36px;font-weight:bold">--°C</span>
+      </div>
+      <div id="weather-desc" style="font-size:13px;color:#000000;font-weight:bold;text-align:center">Loading…</div>
+      <div id="weather-detail" style="font-size:11px;color:#000000;text-align:center;margin-top:2px"></div>
+      <div id="weather-timeline" style="display:none"></div>
+      <div id="weather-attrib" style="position:absolute;bottom:5px;font-size:9px;color:#cccccc">Met Office data (UKMO UKV 2km) via Open-Meteo</div>
+    </div>
+
+    <div class="top-panel">
+      <div class="panel-label">Bin Collection — Garforth</div>
+      <div id="bin-icons"></div>
+      <div id="bin-status" style="font-size:14px;font-weight:bold;color:#333;text-align:center">Loading…</div>
+      <div id="bin-next" style="font-size:10px;color:#888;text-align:center;margin-top:3px"></div>
+    </div>
+
+  </div>
+
+  <!-- ══ CALENDAR AREA 70vh ══ -->
+  <div id="cal-area">
+
+    <div id="cal-nav">
+      <button class="cnav-btn" id="btnPrev">&#8249;</button>
+      <button class="cnav-btn" id="btnNext">&#8250;</button>
+      <span id="cal-nav-title" style="font-size:14px;font-weight:bold;color:#333;flex:0 1 auto;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"></span>
+      <button class="cnav-today" onclick="goToday()">Today</button>
+      <div id="members-strip"></div>
+      <div style="flex:1"></div>
+      <div class="view-tabs">
+        <button class="vtab" id="tabMonth" onclick="switchView('month')">Month</button>
+        <button class="vtab active" id="tabWeek" onclick="switchView('week')">Week</button>
+        <button class="vtab" id="tabAgenda" onclick="switchView('agenda')">Agenda</button>
+      </div>
+      <button class="icon-btn" onclick="refreshAllSources()" title="Sync">&#8635;</button>
+      <button class="icon-btn" onclick="openSettings()" title="Settings">&#9881;</button>
+    </div>
+
+    <div id="week-view" style="display:flex;flex:1 1 0;flex-direction:column;overflow:hidden;min-height:0"></div>
+    <div id="month-view" style="display:none;flex:1 1 0;flex-direction:column;overflow:hidden;min-height:0"></div>
+    <div id="agenda-view" style="display:none;flex:1 1 0;overflow-y:auto;padding:14px 22px"></div>
+
+  </div>
+</div>
+
+<!-- EVENT POPUP -->
+<div id="evt-popup">
+  <button id="popup-close" onclick="closePopup()">&#215;</button>
+  <div id="popup-bar"></div>
+  <div id="popup-title"></div>
+  <div id="popup-meta"></div>
+</div>
+
+<!-- SETTINGS -->
+<div id="settings-overlay">
+  <div id="sp">
+    <div class="sph">
+      <span class="sph-title">Settings</span>
+      <button class="sph-close" onclick="closeSettings()">&#215;</button>
+    </div>
+    <div class="spb">
+
+      <div class="sps">
+        <div class="sps-title">Display preferences</div>
+        <div class="spr"><span class="spl">Week starts</span>
+          <select class="spi" id="pw"><option value="0">Sunday</option><option value="1" selected>Monday</option></select></div>
+        <div class="spr"><span class="spl">Time format</span>
+          <select class="spi" id="ptf"><option value="12">12 hour</option><option value="24" selected>24 hour</option></select></div>
+        <div class="spr"><span class="spl">Agenda days</span>
+          <input type="number" class="spi" id="pad" value="30" min="7" max="90" style="max-width:65px"></div>
+      </div>
+
+      <div class="sps">
+        <div class="sps-title">Bin day configuration</div>
+        <div class="bin-note">
+          Look up your specific days at <strong>leeds.gov.uk → bins → check your bin day</strong> using your postcode.
+          Leeds uses alternate-week schedules for green and brown bins — note which week type you are.
+        </div>
+        <div class="spr"><span class="spl">Black bin</span>
+          <select class="spi" id="bb-day" style="max-width:120px">
+            <option value="-1">Not set</option>
+            <option value="0">Sunday</option><option value="1">Monday</option><option value="2">Tuesday</option>
+            <option value="3">Wednesday</option><option value="4">Thursday</option><option value="5">Friday</option><option value="6">Saturday</option>
+          </select>
+          <select class="spi" id="bb-freq" style="max-width:140px">
+            <option value="weekly">Every week</option><option value="altA">Alt week A</option><option value="altB">Alt week B</option>
+          </select>
+        </div>
+        <div class="spr"><span class="spl">Green bin</span>
+          <select class="spi" id="bg-day" style="max-width:120px">
+            <option value="-1">Not set</option>
+            <option value="0">Sunday</option><option value="1">Monday</option><option value="2">Tuesday</option>
+            <option value="3">Wednesday</option><option value="4">Thursday</option><option value="5">Friday</option><option value="6">Saturday</option>
+          </select>
+          <select class="spi" id="bg-freq" style="max-width:140px">
+            <option value="weekly">Every week</option><option value="altA">Alt week A</option><option value="altB">Alt week B</option>
+          </select>
+        </div>
+        <div class="spr"><span class="spl">Brown bin</span>
+          <select class="spi" id="bw-day" style="max-width:120px">
+            <option value="-1">Not set</option>
+            <option value="0">Sunday</option><option value="1">Monday</option><option value="2">Tuesday</option>
+            <option value="3">Wednesday</option><option value="4">Thursday</option><option value="5">Friday</option><option value="6">Saturday</option>
+          </select>
+          <select class="spi" id="bw-freq" style="max-width:140px">
+            <option value="weekly">Every week</option><option value="altA">Alt week A</option><option value="altB">Alt week B</option>
+          </select>
+        </div>
+        <div class="spr"><span class="spl">This week is</span>
+          <select class="spi" id="bref" style="max-width:120px"><option value="A">Week A</option><option value="B">Week B</option></select>
+          <span style="font-size:10px;color:#888">Used to compute alt-week schedule</span>
+        </div>
+      </div>
+
+      <div class="sps">
+        <div class="sps-title">Family members &amp; colour coding</div>
+        <div id="med"></div>
+        <button class="add-sp" onclick="addMember()">+ Add member</button>
+      </div>
+
+      <div class="sps">
+        <div class="sps-title">Calendar sources (iCal / CalDAV)</div>
+        <p style="font-size:10px;color:#888;margin-bottom:9px;line-height:1.6">
+          Add URLs to <strong>calendars.json</strong> and run <code>sync.py</code> on your server — this is the reliable method. Alternatively, upload a local <strong>.ics file</strong> directly below.
+          Sources in calendars.json are auto-imported when the page loads via serve.py.
+        </p>
+        <div id="sed"></div>
+
+        <div style="font-size:9px;font-weight:bold;letter-spacing:0.1em;text-transform:uppercase;color:#999;margin:10px 0 6px">Add by URL</div>
+        <div style="display:grid;grid-template-columns:1fr auto;gap:7px">
+          <input type="text" class="spi" id="nsu" placeholder="https://…/basic.ics or webcal://…">
+          <button class="sync-sp" onclick="addSource()">Add</button>
+        </div>
+        <div style="display:flex;gap:7px;margin-top:5px">
+          <input type="text" class="spi" id="nsn" placeholder="Name (optional)" style="max-width:170px">
+          <select class="spi" id="nsm" style="max-width:155px"><option value="">No member</option></select>
+        </div>
+
+        <div style="font-size:9px;font-weight:bold;letter-spacing:0.1em;text-transform:uppercase;color:#999;margin:12px 0 6px">Add local .ics file</div>
+        <div style="display:flex;gap:7px;align-items:center">
+          <input type="file" accept=".ics,text/calendar" class="spi" id="icsFileInput" onchange="handleFileUpload(this)" style="padding:4px;cursor:pointer">
+        </div>
+        <p style="font-size:10px;color:#aaa;margin-top:5px;line-height:1.5">Note: uploaded files are stored in browser memory. Re-upload after clearing browser data.</p>
+      </div>
+
+      <button class="sp-save" onclick="saveSettings()">Save settings</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+// ═══ STATE ════════════════════════════════════════════
+let cfg = {
+  view: 'week', weekStart: 1, timeFmt: 24, agendaDays: 30,
+  members: [
+    { id: 1, name: 'Shared',   color: '#3a7bd5', visible: true },
+    { id: 2, name: 'Personal', color: '#27ae60', visible: true },
+  ],
+  sources: [],
+  bins: { black:{day:-1,freq:'weekly'}, green:{day:-1,freq:'altA'}, brown:{day:-1,freq:'altB'}, refWeek:'A' },
+};
+let events = [], curDate = new Date(), midCtr = 100;
+
+// ═══ PERSISTENCE ══════════════════════════════════════
+function loadCfg(){
+  try{
+    const s=localStorage.getItem('hc3_cfg'); if(s) cfg=Object.assign(cfg,JSON.parse(s));
+    if(!cfg.bins) cfg.bins={black:{day:-1,freq:'weekly'},green:{day:-1,freq:'altA'},brown:{day:-1,freq:'altB'},refWeek:'A'};
+    const e=localStorage.getItem('hc3_evts');
+    if(e){
+      // Revive Date strings back to Date objects after JSON.parse
+      events=JSON.parse(e,(_k,v)=>{
+        if(typeof v==='string'&&/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(v)) return new Date(v);
+        return v;
+      });
+    }
+    midCtr=Math.max(midCtr,...cfg.members.map(m=>m.id))+1;
+  }catch(_){}
+}
+function saveCfg(){ localStorage.setItem('hc3_cfg',JSON.stringify(cfg)); }
+function saveEvts(){ localStorage.setItem('hc3_evts',JSON.stringify(events)); }
+
+// ═══ CLOCK ════════════════════════════════════════════
+function updateClock(){
+  const now=new Date(), h=now.getHours(), m=now.getMinutes();
+  const ts=cfg.timeFmt==12?`${h%12||12}:${pad(m)} ${h<12?'am':'pm'}`:`${pad(h)}:${pad(m)}`;
+  document.getElementById('clock-display').textContent=ts;
+  const DN=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+  const MN=['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const d=now.getDate(), sf=[,'st','nd','rd'][d%100>10&&d%100<14?0:d%10]||'th';
+  document.getElementById('date-display').textContent=`${DN[now.getDay()]}, ${d}${sf} ${MN[now.getMonth()]} ${now.getFullYear()}`;
+}
+
+// ═══ WEATHER — UKMO UKV 2km via Open-Meteo (Garforth) ═
+async function fetchWeather(){
+  try{
+    const r=await fetch('https://api.open-meteo.com/v1/forecast?latitude=53.79&longitude=-1.38&current=temperature_2m,apparent_temperature,weather_code,wind_speed_10m&hourly=temperature_2m,weather_code,precipitation_probability&daily=temperature_2m_max,temperature_2m_min&timezone=Europe%2FLondon&forecast_days=2&models=ukmo_seamless');
+    const d=await r.json(), c=d.current, dy=d.daily;
+    const t=Math.round(c.temperature_2m), fl=Math.round(c.apparent_temperature), w=Math.round(c.wind_speed_10m);
+    const mx=dy?Math.round(dy.temperature_2m_max[0]):null, mn=dy?Math.round(dy.temperature_2m_min[0]):null;
+    document.getElementById('weather-icon').textContent=wxI(c.weather_code);
+    document.getElementById('weather-temp').textContent=`${t}°C`;
+    document.getElementById('weather-desc').textContent=wxD(c.weather_code);
+    document.getElementById('weather-detail').textContent=`Feels ${fl}°C · Wind ${w} km/h${mx!==null?` · High ${mx}° Low ${mn}°`:''}`;
+    // Build 5-hour timeline
+    if(d.hourly){
+      const now=new Date();
+      const curHourIdx=d.hourly.time.findIndex(t=>new Date(t)>now)-1;
+      const startIdx=Math.max(0,curHourIdx);
+      const tl=document.getElementById('weather-timeline');
+      tl.style.display='flex';
+      let slots='';
+      for(let i=startIdx;i<startIdx+5&&i<d.hourly.time.length;i++){
+        const hTime=new Date(d.hourly.time[i]);
+        const hLabel=`${pad(hTime.getHours())}:00`;
+        const hTemp=Math.round(d.hourly.temperature_2m[i]);
+        const hCode=d.hourly.weather_code[i];
+        const hRain=d.hourly.precipitation_probability?.[i];
+        const rainStr=hRain!=null&&hRain>10?`${hRain}%`:'';
+        const isNow=i===startIdx;
+        slots+=`<div class="wt-slot${isNow?' wt-now':''}">
+          <div class="wt-time">${isNow?'Now':hLabel}</div>
+          <div class="wt-icon">${wxI(hCode)}</div>
+          <div class="wt-temp">${hTemp}°</div>
+          ${rainStr?`<div class="wt-rain">${rainStr}</div>`:'<div class="wt-rain">&nbsp;</div>'}
+        </div>`;
+      }
+      tl.innerHTML=slots;
+    }
+  }catch(e){
+    document.getElementById('weather-desc').textContent='Unavailable';
+    document.getElementById('weather-detail').textContent='Check network';
+  }
+}
+function wxI(c){
+  if(c===0)return'☀️'; if(c<=2)return'⛅'; if(c<=3)return'☁️'; if(c<=49)return'🌫️';
+  if(c<=69)return'🌧️'; if(c<=79)return'❄️'; if(c<=82)return'🌦️'; if(c<=99)return'⛈️'; return'🌤️';
+}
+function wxD(c){
+  return({0:'Clear sky',1:'Mainly clear',2:'Partly cloudy',3:'Overcast',45:'Foggy',48:'Rime fog',
+    51:'Light drizzle',53:'Drizzle',55:'Heavy drizzle',61:'Light rain',63:'Rain',65:'Heavy rain',
+    71:'Light snow',73:'Snow',75:'Heavy snow',80:'Light showers',81:'Showers',82:'Heavy showers',
+    95:'Thunderstorm',96:'Thunderstorm+hail',99:'Thunderstorm+heavy hail'}[c])||'Cloudy';
+}
+
+// ═══ BIN DAY ══════════════════════════════════════════
+const BN={black:'General',green:'Recycling',brown:'Garden'};
+function isoWeek(d){
+  const dt=new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate()));
+  dt.setUTCDate(dt.getUTCDate()+4-(dt.getUTCDay()||7));
+  return Math.ceil(((dt-new Date(Date.UTC(dt.getUTCFullYear(),0,1)))/86400000+1)/7);
+}
+function weekType(d){
+  const diffW=isoWeek(d)-isoWeek(new Date());
+  return (cfg.bins.refWeek==='A')===(diffW%2===0)?'A':'B';
+}
+function binOnDay(type,d){
+  const b=cfg.bins[type]; if(!b||b.day<0) return false;
+  if(d.getDay()!==b.day) return false;
+  if(b.freq==='weekly') return true;
+  const wt=weekType(d);
+  return b.freq==='altA'?wt==='A':wt==='B';
+}
+function binThisWeek(type){
+  const tod=new Date(); tod.setHours(0,0,0,0);
+  const dow=tod.getDay(), ws=cfg.weekStart;
+  let startDiff=dow-ws; if(startDiff<0)startDiff+=7;
+  for(let i=0;i<7;i++){
+    const d=new Date(tod); d.setDate(tod.getDate()-startDiff+i);
+    if(binOnDay(type,d)) return true;
+  }
+  return false;
+}
+function renderBins(){
+  const tod=new Date(); tod.setHours(0,0,0,0);
+  const tom=new Date(tod); tom.setDate(tom.getDate()+1);
+  const todB=['black','green','brown'].filter(t=>binOnDay(t,tod));
+  const tomB=['black','green','brown'].filter(t=>binOnDay(t,tom));
+  const thisWkB=['black','green','brown'].filter(t=>binThisWeek(t));
+  const nextD={};
+  for(let i=1;i<=21;i++){
+    const d=new Date(tod); d.setDate(d.getDate()+i);
+    ['black','green','brown'].forEach(t=>{ if(!nextD[t]&&binOnDay(t,d)) nextD[t]=d; });
+  }
+
+  document.getElementById('bin-icons').innerHTML=['black','green','brown'].map(t=>{
+    const isToday=todB.includes(t)||tomB.includes(t);
+    const isWeek=thisWkB.includes(t)&&!isToday;
+    const cls=isToday?'today-active':isWeek?'week-active':'inactive';
+
+    return`<div class="bin-icon ${cls} bin-type-${t}">
+      <div class="bin-body">
+        <div class="bin-lid"></div>
+        <span class="bin-letter">${t[0].toUpperCase()}</span>
+      </div>
+      <div class="bin-icon-lbl">${BN[t]}</div>
+    </div>`;
+  }).join('');
+
+  const DN=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  const st=document.getElementById('bin-status'), nx=document.getElementById('bin-next');
+  if(todB.length){
+    st.textContent=`${todB.map(t=>BN[t]).join(' & ')} bin${todB.length>1?'s':''} out today`;
+    st.style.color='#000000';
+  } else if(tomB.length){
+    st.textContent=`${tomB.map(t=>BN[t]).join(' & ')} bin${tomB.length>1?'s':''} tomorrow`;
+    st.style.color='#000000';
+  } else {
+    const up=Object.entries(nextD).sort((a,b)=>a[1]-b[1]);
+    if(up.length){const[bt,bd]=up[0];const diff=Math.round((bd-tod)/86400000);st.textContent=`Next: ${BN[bt]} in ${diff} day${diff>1?'s':''}`;st.style.color='#000000';}
+    else{st.textContent='Configure bin days in settings';st.style.color='#888888';}
+  }
+  const lines=['black','green','brown'].filter(t=>nextD[t]).map(t=>{
+    const d=nextD[t],diff=Math.round((d-tod)/86400000);
+    return`${BN[t]}: ${DN[d.getDay()]} ${d.getDate()} (${diff}d)`;
+  });
+  nx.textContent=lines.length?lines.join('  ·  '):'';
+}
+
+// ═══ ICAL ════════════════════════════════════════════
+function parseICS(txt,sid){
+  // RFC 5545 line unfolding: CRLF/LF followed by whitespace = continuation
+  const unfolded=txt.replace(/\r\n/g,'\n').replace(/\r/g,'\n').replace(/\n[ \t]/g,'');
+  const lines=unfolded.split('\n');
+  const out=[]; let ev=null;
+  for(const ln of lines){
+    const trimmed=ln.trim(); if(!trimmed) continue;
+    if(trimmed==='BEGIN:VEVENT'){ev={sid}; continue;}
+    if(trimmed==='END:VEVENT'){if(ev&&ev.start)out.push(ev); ev=null; continue;}
+    if(!ev) continue;
+    const ci=trimmed.indexOf(':'); if(ci<0) continue;
+    // Key may contain parameters: e.g. DTSTART;TZID=Europe/London
+    const keyFull=trimmed.slice(0,ci);
+    const key=keyFull.split(';')[0].toUpperCase();
+    const val=trimmed.slice(ci+1);
+    if(key==='SUMMARY')    ev.title=icsUnescape(val);
+    else if(key==='DESCRIPTION') ev.desc=icsUnescape(val);
+    else if(key==='LOCATION')    ev.loc=icsUnescape(val);
+    else if(key==='UID')         ev.uid=val;
+    else if(key==='RRULE')       ev.rrule=val;
+    else if(key==='DTSTART'){
+      ev.allDay=!val.includes('T');
+      ev.start=pd(val);
+    }
+    else if(key==='DTEND')  ev.end=pd(val);
+    else if(key==='DURATION'&&!ev.end&&ev.start) ev._dur=val;
+  }
+  // Resolve DURATION into end date where DTEND absent
+  out.forEach(e=>{
+    if(e._dur&&!e.end&&e.start) e.end=applyDuration(e.start,e._dur);
+    delete e._dur;
+  });
+  return out;
+}
+function icsUnescape(s){
+  return s.replace(/\\n/g,'\n').replace(/\\N/g,'\n').replace(/\\,/g,',').replace(/\\;/g,';').replace(/\\\\/g,'\\');
+}
+function applyDuration(start,dur){
+  // Parse ISO 8601 duration e.g. P1DT2H
+  const m=dur.match(/P(?:(\d+)W)?(?:(\d+)D)?(?:T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?)?/);
+  if(!m) return null;
+  const ms=(+m[1]||0)*7*86400000+(+m[2]||0)*86400000+(+m[3]||0)*3600000+(+m[4]||0)*60000+(+m[5]||0)*1000;
+  return new Date(start.getTime()+ms);
+}
+function pd(s){
+  s=s.trim();
+  // Strip any VALUE= or TZID= param remnants that may have slipped through
+  s=s.replace(/^[^:]*:/,'');
+  const isUTC=s.endsWith('Z');
+  if(s.length===8) return new Date(+s.slice(0,4),+s.slice(4,6)-1,+s.slice(6,8));
+  const y=s.slice(0,4),mo=s.slice(4,6),d=s.slice(6,8),h=s.slice(9,11)||'00',mi=s.slice(11,13)||'00',sc=s.slice(13,15)||'00';
+  if(isUTC) return new Date(`${y}-${mo}-${d}T${h}:${mi}:${sc}Z`);
+  // Treat as local time (browser timezone)
+  return new Date(+y,+mo-1,+d,+h,+mi,+sc);
+}
+function expandRrule(ev,rs,re){
+  if(!ev.rrule)return[ev];
+  const rule={},res=[];
+  ev.rrule.split(';').forEach(p=>{const[k,v]=p.split('=');rule[k]=v;});
+  const freq=rule.FREQ,cnt=rule.COUNT?+rule.COUNT:200,until=rule.UNTIL?pd(rule.UNTIL):null;
+  const intv=rule.INTERVAL?+rule.INTERVAL:1,dur=ev.end?ev.end-ev.start:0;
+  let cur=new Date(ev.start),n=0;
+  while(n<cnt){
+    if(until&&cur>until)break; if(cur>re)break;
+    if(cur>=rs)res.push({...ev,start:new Date(cur),end:ev.end?new Date(cur.getTime()+dur):null,rec:true});
+    if(freq==='DAILY')cur.setDate(cur.getDate()+intv);
+    else if(freq==='WEEKLY')cur.setDate(cur.getDate()+7*intv);
+    else if(freq==='MONTHLY')cur.setMonth(cur.getMonth()+intv);
+    else if(freq==='YEARLY')cur.setFullYear(cur.getFullYear()+intv);
+    else break; n++;
+  }
+  return res;
+}
+
+// ═══ SOURCES ══════════════════════════════════════════
+async function fetchSource(src){
+  src.status='loading'; rdot(src);
+
+  // Data URLs (uploaded files) — read directly
+  if(src.url.startsWith('data:')||src.url.startsWith('blob:')){
+    try{
+      const r=await fetch(src.url);
+      const txt=await r.text();
+      events=events.filter(e=>e.sid!==src.id);
+      const parsed=parseICS(txt,src.id);
+      events.push(...parsed);
+      saveEvts(); src.status='ok';
+      toast(`Loaded: ${src.name||'calendar'} (${parsed.length} events)`);
+    }catch(e){src.status='error';toast(`Failed to read file: ${e.message}`,1);}
+    rdot(src); saveCfg(); renderView(); return;
+  }
+
+  // Local ICS file served by serve.py — same origin, no CORS
+  if(src.filename){
+    try{
+      const r=await fetch(`/ics/${src.filename}?t=${Date.now()}`);
+      if(!r.ok) throw new Error(`HTTP ${r.status}`);
+      const txt=await r.text();
+      if(!txt.includes('BEGIN:VCALENDAR')&&!txt.includes('BEGIN:VEVENT'))
+        throw new Error('Not a valid ICS file — run sync.py first');
+      events=events.filter(e=>e.sid!==src.id);
+      const parsed=parseICS(txt,src.id);
+      events.push(...parsed);
+      saveEvts(); src.status='ok';
+      toast(`Loaded: ${src.name||'calendar'} (${parsed.length} events)`);
+      rdot(src); saveCfg(); renderView(); return;
+    }catch(e){
+      // File not found yet — prompt user to run sync
+      src.status='error';
+      toast(`"${src.name||'calendar'}": ${e.message} — run sync.py on your server`,1);
+      rdot(src); saveCfg(); renderView(); return;
+    }
+  }
+
+  // Fallback: no filename set, nothing we can do from the browser
+  src.status='error';
+  toast(`"${src.name||'calendar'}": no local file — run sync.py on your server`,1);
+  rdot(src); saveCfg(); renderView();
+}
+
+async function refreshAllSources(){
+  if(!cfg.sources.length){toast('No calendar sources — add them in Settings');return;}
+  toast(`Loading ${cfg.sources.length} calendar${cfg.sources.length>1?'s':''}…`);
+  for(const s of cfg.sources) await fetchSource(s);
+}
+
+// Load sources config from calendars.json (written by sync.py)
+async function loadRemoteConfig(){
+  try{
+    const r=await fetch(`/calendars.json?t=${Date.now()}`);
+    if(!r.ok) return; // Not running via serve.py — skip
+    const remote=await r.json();
+    if(!remote.sources||!remote.sources.length) return;
+    // Merge remote sources into cfg: add any not already in cfg
+    let changed=false;
+    for(const rs of remote.sources){
+      const existing=cfg.sources.find(s=>s.id===rs.id||s.name===rs.name);
+      if(!existing){
+        cfg.sources.push(rs);
+        changed=true;
+      } else if(rs.filename&&!existing.filename){
+        existing.filename=rs.filename;
+        changed=true;
+      }
+    }
+    if(changed){ saveCfg(); }
+  }catch(_){}
+}
+
+function rdot(src){const el=document.getElementById(`sd-${src.id}`);if(el)el.className=`sdot ${src.status||''}`;}
+
+// Handle local .ics file upload
+function handleFileUpload(input){
+  const file=input.files[0]; if(!file) return;
+  if(!file.name.endsWith('.ics')&&file.type!=='text/calendar'){
+    toast('Please select an .ics file',1); return;
+  }
+  const reader=new FileReader();
+  reader.onload=e=>{
+    const name=document.getElementById('nsn').value.trim()||file.name.replace('.ics','');
+    const mid=document.getElementById('nsm').value;
+    const src={id:Date.now(),url:e.target.result,name,memberId:mid?+mid:null,status:'idle',isFile:true};
+    cfg.sources.push(src);
+    document.getElementById('nsn').value='';
+    input.value='';
+    renderSeditor();
+    fetchSource(src);
+  };
+  reader.readAsText(file);
+}
+// ═══ EVENT HELPERS ═════════════════════════════════════
+function evtCol(ev){
+  const src=cfg.sources.find(s=>s.id===ev.sid);
+  if(src?.memberId){const m=cfg.members.find(m=>m.id==src.memberId);if(m)return m.color;}
+  if(src?.color)return src.color;
+  const pal=['#3a7bd5','#27ae60','#8e44ad','#e67e22','#c0392b','#16a085'];
+  return pal[(cfg.sources.indexOf(src)+1)%pal.length];
+}
+function isVis(ev){
+  const src=cfg.sources.find(s=>s.id===ev.sid);
+  if(src?.memberId){const m=cfg.members.find(m=>m.id==src.memberId);if(m&&!m.visible)return false;}
+  return true;
+}
+function evtsFor(date){
+  const ds=dstr(date),rs=new Date(date.getFullYear(),date.getMonth(),date.getDate()),re=new Date(rs.getTime()+86400000);
+  const out=[],seen=new Set();
+  for(const ev of events){if(!isVis(ev))continue;
+    for(const e of expandRrule(ev,rs,re)){
+      const k=`${e.uid||e.title}-${e.start}`;if(seen.has(k))continue;seen.add(k);
+      const ee=e.end||new Date(e.start.getTime()+3600000);
+      if(e.allDay?dstr(e.start)===ds:e.start<re&&ee>rs)out.push(e);
+    }
+  }
+  return out.sort((a,b)=>a.start-b.start);
+}
+function evtsRange(rs,re){
+  const out=[],seen=new Set();
+  for(const ev of events){if(!isVis(ev))continue;
+    for(const e of expandRrule(ev,rs,re)){
+      const k=`${e.uid||e.title||Math.random()}-${e.start}`;if(seen.has(k))continue;seen.add(k);
+      const ee=e.end||new Date(e.start.getTime()+3600000);
+      if(e.start<re&&ee>rs)out.push(e);
+    }
+  }
+  return out.sort((a,b)=>a.start-b.start);
+}
+function dstr(d){return`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;}
+function pad(n){return String(n).padStart(2,'0');}
+
+// ═══ VIEW SWITCHING ════════════════════════════════════
+function switchView(v){
+  cfg.view=v;
+  ['month','week','agenda'].forEach(n=>{
+    document.getElementById(`tab${n[0].toUpperCase()+n.slice(1)}`).classList.toggle('active',v===n);
+    const el=document.getElementById(`${n}-view`);
+    el.style.display=v===n?(n==='agenda'?'block':'flex'):'none';
+    if(v===n)el.style.flexDirection='column';
+  });
+  saveCfg(); renderView();
+}
+function goToday(){curDate=new Date();renderView();}
+function renderView(){renderMembersStrip();if(cfg.view==='week')renderWeek();else if(cfg.view==='month')renderMonth();else renderAgenda();}
+
+// ═══ WEEK VIEW ═════════════════════════════════════════
+function renderWeek(){
+  const el=document.getElementById('week-view');
+  const ws=cfg.weekStart;
+  let wS=new Date(curDate);wS.setHours(0,0,0,0);
+  let diff=wS.getDay()-ws;if(diff<0)diff+=7;wS.setDate(wS.getDate()-diff);
+  const wE=new Date(wS.getTime()+7*86400000);
+  const days=Array.from({length:7},(_,i)=>{const d=new Date(wS);d.setDate(d.getDate()+i);return d;});
+  const MN=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const DN=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  const fm=MN[days[0].getMonth()],lm=MN[days[6].getMonth()];
+  document.getElementById('cal-nav-title').textContent=`${fm===lm?fm:`${fm}–${lm}`} ${days[0].getDate()}–${days[6].getDate()}, ${days[6].getFullYear()}`;
+  document.getElementById('btnPrev').onclick=()=>{curDate=new Date(curDate.getTime()-7*86400000);renderView();};
+  document.getElementById('btnNext').onclick=()=>{curDate=new Date(curDate.getTime()+7*86400000);renderView();};
+  const todStr=dstr(new Date());
+  const HH=56, TOTAL=24*HH;
+  let h=`<div id="wk-hdr"><div class="wkh-gut"></div>`;
+  days.forEach(d=>{const isT=dstr(d)===todStr;
+    h+=`<div class="wkh-day"><span class="wkh-dn">${DN[d.getDay()]}</span>${isT?`<span class="wkh-num today">${d.getDate()}</span>`:`<span class="wkh-num">${d.getDate()}</span>`}</div>`;
+  });
+  h+=`</div><div id="wk-scroll"><div id="wk-body"><div class="wb-tc" style="height:${TOTAL}px">`;
+  for(let i=0;i<24;i++)h+=`<div class="wb-tl" style="top:${i*HH}px">${fmtH(i)}</div>`;
+  h+=`</div>`;
+  const rEvts=evtsRange(wS,wE);
+  days.forEach(d=>{
+    const ds=dstr(d),d0=new Date(d),d1=new Date(d.getTime()+86400000);
+    const dEvts=rEvts.filter(e=>{if(e.allDay)return dstr(e.start)===ds;const ee=e.end||new Date(e.start.getTime()+3600000);return e.start<d1&&ee>d0;});
+    h+=`<div class="wb-dc" style="height:${TOTAL}px">`;
+    for(let i=0;i<24;i++){h+=`<div class="hr-line" style="top:${i*HH}px"></div><div class="hh-line" style="top:${i*HH+HH/2}px"></div>`;}
+    dEvts.forEach(ev=>{
+      const col=evtCol(ev);
+      const ed=JSON.stringify({title:ev.title,start:ev.start?.toISOString(),end:ev.end?.toISOString(),allDay:ev.allDay,desc:ev.desc,loc:ev.loc,col});
+      if(ev.allDay){
+        h+=`<div class="wk-evt allday" style="background:${col}" onclick="showPopup(event,${ed})">${esc(ev.title)}</div>`;
+      } else {
+        const sm=ev.start.getHours()*60+ev.start.getMinutes();
+        const ee=ev.end||new Date(ev.start.getTime()+3600000),em=ee.getHours()*60+ee.getMinutes();
+        const tp=sm/60*HH,ht=Math.max(16,(em-sm)/60*HH-2);
+        h+=`<div class="wk-evt" style="background:${col};top:${tp}px;height:${ht}px" onclick="showPopup(event,${ed})">${esc(ev.title)}</div>`;
+      }
+    });
+    if(ds===todStr){const now=new Date(),nm=now.getHours()*60+now.getMinutes(),tp=nm/60*HH;
+      h+=`<div class="now-line" style="top:${tp}px"><div class="now-dot"></div></div>`;}
+    h+=`</div>`;
+  });
+  h+=`</div></div>`;
+  el.innerHTML=h;
+  const sc=document.getElementById('wk-scroll');
+  if(sc){const now=new Date();sc.scrollTop=(now.getHours()*HH)-80;}
+}
+
+// ═══ MONTH VIEW ════════════════════════════════════════
+function renderMonth(){
+  const el=document.getElementById('month-view');
+  const y=curDate.getFullYear(),mo=curDate.getMonth();
+  const MN=['January','February','March','April','May','June','July','August','September','October','November','December'];
+  document.getElementById('cal-nav-title').textContent=`${MN[mo]} ${y}`;
+  document.getElementById('btnPrev').onclick=()=>{curDate=new Date(y,mo-1,1);renderView();};
+  document.getElementById('btnNext').onclick=()=>{curDate=new Date(y,mo+1,1);renderView();};
+  const ws=cfg.weekStart,DN=ws===1?['Mon','Tue','Wed','Thu','Fri','Sat','Sun']:['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  const first=new Date(y,mo,1);let sd=first.getDay()-ws;if(sd<0)sd+=7;
+  const dim=new Date(y,mo+1,0).getDate(),total=Math.ceil((sd+dim)/7)*7,todStr=dstr(new Date());
+  let h=`<div class="mv-hdr">${DN.map(d=>`<div class="mv-dlbl">${d}</div>`).join('')}</div><div class="mv-grid">`;
+  for(let i=0;i<total;i++){
+    const cell=new Date(y,mo,i-sd+1),ds=dstr(cell);
+    const isT=ds===todStr,isO=cell.getMonth()!==mo,evts=evtsFor(cell);
+    h+=`<div class="mv-cell${isT?' tc':''}${isO?' om':''}"><div class="mv-num">${cell.getDate()}</div>
+    ${evts.slice(0,3).map(e=>`<div class="mv-evt" style="background:${evtCol(e)}">${esc(e.allDay?e.title:fmtT(e.start)+' '+e.title)}</div>`).join('')}
+    ${evts.length>3?`<div class="mv-more">+${evts.length-3}</div>`:''}</div>`;
+  }
+  h+=`</div>`;
+  el.innerHTML=h;
+}
+
+// ═══ AGENDA VIEW ═══════════════════════════════════════
+function renderAgenda(){
+  const el=document.getElementById('agenda-view');
+  const days=cfg.agendaDays||30;
+  const start=new Date(curDate);start.setHours(0,0,0,0);
+  const todStr=dstr(new Date());
+  const MN=['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const DN=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+  document.getElementById('cal-nav-title').textContent=`Next ${days} days`;
+  document.getElementById('btnPrev').onclick=()=>{curDate=new Date(curDate.getTime()-days*86400000);renderView();};
+  document.getElementById('btnNext').onclick=()=>{curDate=new Date(curDate.getTime()+days*86400000);renderView();};
+  let h='';
+  for(let i=0;i<days;i++){
+    const d=new Date(start.getTime()+i*86400000),ds=dstr(d),evts=evtsFor(d);
+    if(!evts.length&&i>0)continue;
+    const isT=ds===todStr;
+    h+=`<div class="ag-day"><div class="ag-dhdr"><span class="ag-dnum">${d.getDate()}</span><span class="ag-dinfo">${DN[d.getDay()]} ${MN[d.getMonth()]}</span>${isT?'<span class="ag-today-tag">Today</span>':''}</div>`;
+    if(!evts.length){h+=`<div class="ag-none">No events</div>`;}
+    else evts.forEach(ev=>{
+      const col=evtCol(ev),ed=JSON.stringify({title:ev.title,start:ev.start?.toISOString(),end:ev.end?.toISOString(),allDay:ev.allDay,desc:ev.desc,loc:ev.loc,col});
+      h+=`<div class="ag-evt" onclick="showPopup(event,${ed})"><div class="ag-etime">${ev.allDay?'All day':fmtT(ev.start)+(ev.end?' – '+fmtT(ev.end):'')}</div><div class="ag-ebar" style="background:${col}"></div><div style="flex:1"><div class="ag-etitle">${esc(ev.title||'Untitled')}</div>${ev.loc?`<div class="ag-esub">📍 ${esc(ev.loc)}</div>`:''}</div></div>`;
+    });
+    h+=`</div>`;
+  }
+  el.innerHTML=h||`<div class="ag-none">No events in this period</div>`;
+}
+
+// ═══ MEMBERS STRIP ═════════════════════════════════════
+function renderMembersStrip(){
+  document.getElementById('members-strip').innerHTML=cfg.members.map(m=>
+    `<div class="mem-pill${m.visible?'':' off'}" onclick="toggleMem(${m.id})"><div class="mem-dot" style="background:${m.color}"></div>${esc(m.name)}</div>`
+  ).join('');
+}
+function toggleMem(id){const m=cfg.members.find(x=>x.id==id);if(m)m.visible=!m.visible;saveCfg();renderView();}
+
+// ═══ EVENT POPUP ═══════════════════════════════════════
+function showPopup(e,ev){
+  e.stopPropagation();
+  const p=document.getElementById('evt-popup');
+  document.getElementById('popup-bar').style.background=ev.col||'#888';
+  document.getElementById('popup-title').textContent=ev.title||'Untitled';
+  let meta=ev.allDay?'All day\n':ev.start?`${fmtDT(new Date(ev.start))}${ev.end?' – '+fmtT(new Date(ev.end)):''}\n`:'';
+  if(ev.loc)meta+=`📍 ${ev.loc}\n`;
+  if(ev.desc)meta+=ev.desc.slice(0,220);
+  document.getElementById('popup-meta').textContent=meta.trim();
+  p.style.display='block';p.classList.add('open');
+  const rc=e.target.getBoundingClientRect();
+  let lf=rc.left+8,tp=rc.bottom+8;
+  if(lf+300>window.innerWidth)lf=window.innerWidth-308;
+  if(tp+200>window.innerHeight)tp=rc.top-210;
+  p.style.left=Math.max(4,lf)+'px';p.style.top=Math.max(4,tp)+'px';
+}
+function closePopup(){const p=document.getElementById('evt-popup');p.classList.remove('open');p.style.display='none';}
+document.addEventListener('click',e=>{
+  const p=document.getElementById('evt-popup');if(!p.contains(e.target))closePopup();
+  if(e.target===document.getElementById('settings-overlay'))closeSettings();
+});
+
+// ═══ SETTINGS ══════════════════════════════════════════
+function openSettings(){
+  document.getElementById('settings-overlay').classList.add('open');
+  document.getElementById('pw').value=cfg.weekStart;
+  document.getElementById('ptf').value=cfg.timeFmt;
+  document.getElementById('pad').value=cfg.agendaDays||30;
+  const b=cfg.bins;
+  ['bb','bg','bw'].forEach((pfx,i)=>{
+    const t=['black','green','brown'][i];
+    document.getElementById(`${pfx}-day`).value=b[t].day;
+    document.getElementById(`${pfx}-freq`).value=b[t].freq;
+  });
+  document.getElementById('bref').value=b.refWeek;
+  renderMeditor();renderSeditor();renderMopts();
+}
+function closeSettings(){document.getElementById('settings-overlay').classList.remove('open');}
+function renderMeditor(){
+  document.getElementById('med').innerHTML=cfg.members.map((m,i)=>
+    `<div class="mr-sp"><input type="color" class="sp-col" value="${m.color}" onchange="cfg.members[${i}].color=this.value"><input class="mn-sp" type="text" value="${esc(m.name)}" oninput="cfg.members[${i}].name=this.value"><button class="del" onclick="removeMember(${m.id})">&#215;</button></div>`
+  ).join('');
+}
+function addMember(){cfg.members.push({id:midCtr++,name:'New member',color:'#888888',visible:true});renderMeditor();renderMopts();}
+function removeMember(id){cfg.members=cfg.members.filter(m=>m.id!==id);renderMeditor();renderMopts();}
+function renderSeditor(){
+  document.getElementById('sed').innerHTML=cfg.sources.map((s,i)=>{
+    const mn=s.memberId?(cfg.members.find(m=>m.id==s.memberId)||{}).name||'':'';
+    const isFile=s.isFile||s.url.startsWith('data:')||s.url.startsWith('blob:');
+    const urlDisplay=isFile?`📄 Local file`:`🔗 ${s.url.length>50?s.url.slice(0,47)+'…':s.url}`;
+    return`<div class="src-sp"><div class="src-sp-top"><div class="sdot ${s.status||''}" id="sd-${s.id}"></div><span class="sn">${esc(s.name||'Unnamed')}</span>${mn?`<span style="font-size:10px;color:#aaa">(${esc(mn)})</span>`:''}<button class="sync-sp" onclick="fetchSource(cfg.sources[${i}])">Sync</button><button class="del" onclick="removeSrc(${s.id})">&#215;</button></div><div class="su">${urlDisplay}</div></div>`;
+  }).join('');
+}
+function renderMopts(){
+  document.getElementById('nsm').innerHTML=`<option value="">No member</option>`+cfg.members.map(m=>`<option value="${m.id}">${esc(m.name)}</option>`).join('');
+}
+function addSource(){
+  let url=document.getElementById('nsu').value.trim(); if(!url)return;
+  // Normalise webcal:// → https://
+  url=url.replace(/^webcal:\/\//i,'https://');
+  const name=document.getElementById('nsn').value.trim(),mid=document.getElementById('nsm').value;
+  const src={id:Date.now(),url,name,memberId:mid?+mid:null,status:'idle'};
+  cfg.sources.push(src);document.getElementById('nsu').value='';document.getElementById('nsn').value='';
+  renderSeditor();fetchSource(src);
+}
+function removeSrc(id){
+  cfg.sources=cfg.sources.filter(s=>s.id!==id);events=events.filter(e=>e.sid!==id);
+  saveCfg();saveEvts();renderSeditor();renderView();
+}
+function saveSettings(){
+  cfg.weekStart=+document.getElementById('pw').value;
+  cfg.timeFmt=+document.getElementById('ptf').value;
+  cfg.agendaDays=+document.getElementById('pad').value;
+  cfg.bins.black={day:+document.getElementById('bb-day').value,freq:document.getElementById('bb-freq').value};
+  cfg.bins.green={day:+document.getElementById('bg-day').value,freq:document.getElementById('bg-freq').value};
+  cfg.bins.brown={day:+document.getElementById('bw-day').value,freq:document.getElementById('bw-freq').value};
+  cfg.bins.refWeek=document.getElementById('bref').value;
+  saveCfg();renderBins();renderView();closeSettings();toast('Settings saved');
+}
+
+// ═══ FORMATTING ════════════════════════════════════════
+function fmtT(d){if(!d)return'';const dt=d instanceof Date?d:new Date(d),h=dt.getHours(),m=dt.getMinutes();return cfg.timeFmt==12?`${h%12||12}:${pad(m)}${h<12?'am':'pm'}`:`${pad(h)}:${pad(m)}`;}
+function fmtDT(d){const MN=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];return`${MN[d.getMonth()]} ${d.getDate()}, ${fmtT(d)}`;}
+function fmtH(h){return cfg.timeFmt==12?`${h%12||12}${h<12?'am':'pm'}`:`${pad(h)}:00`;}
+function esc(s){if(!s)return'';return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
+
+// ═══ TOAST ═════════════════════════════════════════════
+let _tt;
+function toast(msg,err){
+  const t=document.getElementById('toast');t.textContent=msg;
+  t.style.borderLeft=err?'3px solid #cc3333':'3px solid #27ae60';
+  t.classList.add('show');clearTimeout(_tt);_tt=setTimeout(()=>t.classList.remove('show'),3000);
+}
+
+// ═══ INIT ══════════════════════════════════════════════
+function init(){
+  loadCfg();
+  updateClock();setInterval(updateClock,10000);
+  ['month','week','agenda'].forEach(v=>{
+    const el=document.getElementById(`${v}-view`);
+    el.style.display=v===cfg.view?(v==='agenda'?'block':'flex'):'none';
+    if(v===cfg.view&&v!=='agenda')el.style.flexDirection='column';
+    document.getElementById(`tab${v[0].toUpperCase()+v.slice(1)}`).classList.toggle('active',v===cfg.view);
+  });
+  renderView();
+  renderBins();
+  fetchWeather();
+  setInterval(fetchWeather,30*60*1000);
+  setInterval(()=>{renderBins();if(cfg.view==='week')renderView();},60000);
+  // Load sources from calendars.json (written by sync.py) then fetch all
+  loadRemoteConfig().then(()=>{
+    if(cfg.sources.length) refreshAllSources();
+  });
+}
+init();
+</script>
+</body>
+</html>
